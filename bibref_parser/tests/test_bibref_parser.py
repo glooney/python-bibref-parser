@@ -12,7 +12,9 @@ class Tester:
 
         #included = [2, 3, 4, 9, 15, 20, 21]
         # included = []
-        included = [2, 3, 4]
+        # included = [2, 3, 4]
+        included = range(1, 52)
+        # included = [8]
 
         input_path = os.path.join(os.path.dirname(__file__), test_filename)
 
@@ -28,18 +30,29 @@ class Tester:
 
                 reference_count += 1
                 r = parser.parse(row[1])
-                errors.test_field(line, 'year', row[3], parser.date, row[1])
-                # errors.test_field(line, 'title', row[4], parser.title, row[1])
-                errors.test_field(
-                    line, 'authors', row[2], parser.authors, row[1])
+                if 0:
+                    errors.test_field(
+                        line, 'year', row[3], parser.date, row[1])
+                if 1:
+                    errors.test_field(
+                        line, 'title', row[4], parser.title, row[1])
+                if 0:
+                    errors.test_field(
+                        line, 'authors', row[2], parser.authors, row[1])
 
         errors.do_assert(reference_count)
+
+
+def normalise(s):
+    return s.strip(' ').strip('.').strip(',')
 
 
 class ParsingErrors(list):
 
     def test_field(self, line, field, expected, parsed, reference):
-        if expected != parsed:
+        expected = normalise(expected)
+        parsed = normalise(parsed)
+        if expected == '' or (expected != parsed):
             self.append(ParsingError(line, field, expected, parsed, reference))
 
     def get_message(self, reference_count):
