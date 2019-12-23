@@ -1,7 +1,9 @@
 from ..parser import BibRefParser
 import os
+import re
 
 test_filename = 'test_dataset.csv'
+# test_filename = 'anystyle-gold.csv'
 
 
 class Tester:
@@ -13,8 +15,14 @@ class Tester:
         #included = [2, 3, 4, 9, 15, 20, 21]
         # included = []
         # included = [2, 3, 4]
-        included = range(1, 52)
+        # included = range(1, 302)
+        included = range(1, 105)
         # included = [8]
+        # included = [19, 80, 20, 69, 4]
+        # included = [32, 34, 38, 39]
+        # included = range(46, 53)
+        # included = [3, 7, 10]
+        # included = [68, 70, 72, 73]
 
         input_path = os.path.join(os.path.dirname(__file__), test_filename)
 
@@ -29,31 +37,46 @@ class Tester:
                     continue
 
                 reference_count += 1
-                r = parser.parse(row[1])
+                parser.parse(row[1])
                 if 0:
                     errors.test_field(
-                        line, 'year', row[3], parser.date, row[1])
+                        line, 'year', row[3], parser.date,
+                        row[1], row[0], parser._ref
+                    )
                 if 1:
                     errors.test_field(
-                        line, 'title', row[4], parser.title, row[1])
+                        line, 'title', row[4], parser.title,
+                        row[1], row[0], parser._ref
+                    )
                 if 0:
                     errors.test_field(
-                        line, 'authors', row[2], parser.authors, row[1])
+                        line, 'authors', row[2], parser.authors,
+                        row[1], row[0], parser._ref
+                    )
 
         errors.do_assert(reference_count)
 
 
-def normalise(s):
-    return s.strip(' ').strip('.').strip(',')
+def normalise(s, field):
+    ret = s
+    if field == 'year':
+        years = re.findall(r'\d{4,4}', s)
+        if years:
+            ret = years[0]
+    ret = re.sub(r'^[",. ]*(.*?)[",. ]*$', r'\1', ret)
+    return ret
 
 
 class ParsingErrors(list):
 
-    def test_field(self, line, field, expected, parsed, reference):
-        expected = normalise(expected)
-        parsed = normalise(parsed)
+    def test_field(self, line, field, expected, parsed, reference, style, annotated):
+        expected = normalise(expected, field)
+        parsed = normalise(parsed, field)
         if expected == '' or (expected != parsed):
-            self.append(ParsingError(line, field, expected, parsed, reference))
+            if not(expected == 'NONE' and parsed == ''):
+                self.append(ParsingError(
+                    line, field, expected, parsed, reference, style, annotated
+                ))
 
     def get_message(self, reference_count):
         ret = '\n'
@@ -91,12 +114,19 @@ class ParsingError:
     def __init__(self, *args, **kwargs):
         self.reset(*args, **kwargs)
 
-    def reset(self, line, field, expected, parsed, reference):
+    def reset(self, line, field, expected, parsed, reference, style, annotated):
         self.line = line
         self.field = field
         self.expected = expected
         self.parsed = parsed
         self.reference = reference
+        self.style = style
+        self.annotated = annotated
 
     def get_message(self):
-        return '#{e.line} {e.field}:\n  {e.expected!r} [expected]\n  {e.parsed!r} [parsed]\n  {e.reference!r}'.format(e=self)
+        ret = '#{e.line} {e.style}, {e.field}:'
+        ret += '\n  {e.expected!r} [expected]'
+        ret += '\n  {e.parsed!r} [parsed]'
+        ret += '\n  {e.reference!r}'
+        ret += '\n  {e.annotated!r}'
+        return ret.format(e=self)
