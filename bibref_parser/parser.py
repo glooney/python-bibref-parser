@@ -80,7 +80,7 @@ class BibRefParser:
                 break
 
         if self.date:
-            self.date += self._extract(r'(({date}[.,;]))', 'date2')
+            self._extract(r'({date}([.,;]))', 'date')
 
         if 1 and self.title and not self.authors:
             # anything in front of title (or date) that isn't a date

@@ -3,12 +3,12 @@ import os
 import re
 
 # 101 references. Errors: 9 year (8.9%), 19 title (18.8%), 7 authors (6.9%)
-# test_filename = 'test_dataset.csv'
-test_filename = 'anystyle-gold.csv'
+test_filename = 'test_dataset.csv'
+# test_filename = 'anystyle-gold.csv'
 
 # target : year: 4%, authors: 9%, titles: 9%
-# test   : year: 2%, authors: 5%, titles: 7%
-# any 1k :           authors:16%, titles: 25%
+# test   : 102, 7 title (6.9%), 5 authors (4.9%), 2 year (2.0%)
+# any 1k : 976, 242 title (24.8%), 155 authors (15.9%), 20 year (2.0%)
 
 
 class Tester:
@@ -28,7 +28,7 @@ class Tester:
         # included = range(46, 53)
         # included = [3, 7, 10]
         # included = [68, 70, 72, 73]
-        # included = [75]
+        # included = [15]
 
         input_path = os.path.join(os.path.dirname(__file__), test_filename)
 
@@ -53,7 +53,7 @@ class Tester:
 
                 reference_count += 1
                 parser.parse(row[1])
-                if 0:
+                if 1:
                     errors.test_field(
                         line, 'year', row[3], parser.date,
                         row[1], row[0], parser._ref
@@ -63,7 +63,7 @@ class Tester:
                         line, 'title', row[4], parser.title,
                         row[1], row[0], parser._ref
                     )
-                if 0:
+                if 1:
                     errors.test_field(
                         line, 'authors', row[2], parser.authors,
                         row[1], row[0], parser._ref
