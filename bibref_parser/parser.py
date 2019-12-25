@@ -15,8 +15,11 @@ class BibRefParser:
         self.date = ''
         self.publisher = ''
 
-        self._ref = self._ref.replace('“', '"').replace('”', '"')
-        self._ref = self._ref.replace('–', '-')
+        self._ref = self._normalise(self._ref)
+
+    @classmethod
+    def _normalise(cls, s):
+        return s.replace('“', '"').replace('”', '"').replace('–', '-')
 
     def _extract(self, pattern, field, first=False):
         ret = ''
@@ -36,32 +39,48 @@ class BibRefParser:
         # get quoted title
         self.title = self._extract(r'("([^"]+)")', 'title')
 
+        datep = r'(\b(18|19|20)\d\d[abc]?\b)'
+
         while not self.date:
             # get bracketed year
-            self.date = self._extract(r'(\([^)]*(\d{4,4})[^)]*\))', 'date')
+            self.date = self._extract(
+                r'(\([^)]*' + datep + r'[^)]*\))', 'date')
 
             # get unique year
             if not self.date:
-                self.date = self._extract(r'((\d{4,4}))', 'date')
+                self.date = self._extract(r'(' + datep + r')', 'date')
 
-            # get unique year not preceded or followed by -
             if not self.date:
                 self.date = self._extract(
-                    r'((?<![-0-9])([12]\d{3,3})(?![-0-9]))', 'date')
+                    r'(\. ' + datep + r'\.)', 'date'
+                )
+
+            if not self.date:
+                self.date = self._extract(
+                    r'(, ' + datep + r'\.)', 'date'
+                )
+
+            if not self.date:
+                self.date = self._extract(
+                    r'(, ' + datep + r',)', 'date'
+                )
+
+            # get unique year not preceded or followed by -
+#             if 0 and not self.date:
+#                 self.date = self._extract(
+#                     r'((?<![-0-9])' + datep + r'(?![-0-9]))', 'date')
 
             # remove access date
-            if not self.date:
+            if 1 and not self.date:
                 access_date = self._extract(
-                    r'(\[[^\]]*(\d{4,4})[^\]]*\])', 'access_date')
+                    r'(\[[^\]]*' + datep + r'[^\]]*\])', 'access_date')
                 if not access_date:
                     break
+            else:
+                break
 
-        if 0 and self.title and self.date:
-            # anything from beginning to first {
-            # deprecated by next rule
-            self.authors = self._extract(
-                r'^(([^{]+))', 'authors',
-            )
+        if self.date:
+            self.date += self._extract(r'(({date}[.,;]))', 'date2')
 
         if 1 and self.title and not self.authors:
             # anything in front of title (or date) that isn't a date
@@ -70,14 +89,14 @@ class BibRefParser:
                 r'^((([^{](?!\d{4,4}))+))', 'authors',
             )
 
-        if 0:
-            # author (without . or ,) -> title
-            # Works sometimes BUT
-            # NO: b/c title can be after
-            if self.authors and not self.title:
-                if not re.search(r'\.|,', self.authors):
-                    self.title = self.authors
-                    self.authors = ''
+#         if 0:
+#             # author (without . or ,) -> title
+#             # Works sometimes BUT
+#             # NO: b/c title can be after
+#             if self.authors and not self.title:
+#                 if not re.search(r'\.|,', self.authors):
+#                     self.title = self.authors
+#                     self.authors = ''
 
         if 1 and not self.authors:
             # the authors field most likely captured the title
@@ -106,7 +125,7 @@ class BibRefParser:
                 #                     'authors1'
                 #                 )
                 self.authors = self._extract(
-                    r'^((((^|,|,? and)( ?[A-Z]{1,2}\.)+ [^,{]+)+))',
+                    r'^((((^|,|,? and)( ?[A-Z]{1,2}\.)+ ([^,{.](?!and ))+)+))',
                     'authors1'
                 )
             if not self.authors:
@@ -118,7 +137,8 @@ class BibRefParser:
                 # Gaudio, J. L., & Snowdon, C. T.
                 # included = [19, 80, 20, 69, 4, 22]
                 self.authors = self._extract(
-                    r'^((([^,.{]+,( ?[A-Z]{1,2}\.)+(\s*\([^)]+\))?,?)+))',
+                    # r'^((([^,.{]+,((| |-)[A-Z]{1,2}\.)+(\s*\([^)]+\))?,?)+))',
+                    r'^((((^|,|,? (and|&) )[^,.{]+,((| |-)[A-Z]{1,2}\.)+(\s*\([^)]+\))?)+))',
                     'authors2'
                 )
             if not self.authors:
@@ -143,12 +163,41 @@ class BibRefParser:
                     'authors4'
                 )
 
-            if self.authors:
+            if 1 and self.authors:
                 self.authors += self._extract(
-                    r'(\{authors\d?\}(\.? ?(,? ?et al\.?)?(,? ?[Ee]ds\.?))?)',
+                    r'(\{authors\d?\}((\.? ?(,? ?(et al|and others)\.?)?(,? ?[Ee]ds\.?))?))',
                     'authors9',
                     True
                 )
+
+        if 1 and not self.authors:
+            # authors = anything from start to . or {
+            # catches 80%
+            # BUT also a lot of FALSE POSITIVES
+            # (i.e. include title and other stuff in the authors)
+            # e.g. Goh, S. L. Polymer Chemistry
+            part = self._extract(
+                # r'^(([^{]+?))(?:\{|(?<![A-Z)])\.)',
+                r'^((((?<=[A-Z])\.|[^{.])+))',
+                'authors8'
+            )
+            if not self.title and (
+                re.match(r'(The|A|An) ', part)
+                # Fast facts
+                or (
+                    re.search(r' [a-z]+\.?$', part)
+                    and not re.search(r' et al\.?$', part)
+                )
+            ):
+                self.title = part
+            else:
+                self.authors = part
+
+            if 0 and self.authors and not self.title:
+                # we might have captured the title in the authors
+                # Michael Pollan, The Omnivore's Dilemma
+                # if self.authors
+                pass
 
         if self.authors and self.date and not self.title:
             # title = anything between } and { with a dot in it
@@ -158,14 +207,6 @@ class BibRefParser:
                 True
             )
 
-        if 1 and not self.authors:
-            # authors = anything from start to . or {
-            # catches a 80% true positive
-            # BUT also a lot of FALSE POSITIVES
-            # (i.e. include title and other stuff in the authors)
-            self.authors = self._extract(
-                r'^(([^{]+?))(?:\{|(?<![A-Z)])\.)', 'authors')
-
         # clean the title
 
         if self.title:
@@ -174,4 +215,7 @@ class BibRefParser:
             # The New Media Monopoly, Boston: Beacon Press
             self.title = re.sub(r',[^,:]+:[^,:]+$', '', self.title)
 
-            self.title = self.title.strip(' ').strip('.').strip(',')
+            self.title = self.title.strip(' ').strip(
+                '.').strip(',')
+
+            self.title = re.sub(r"^'(.+)'$", r"\1", self.title)

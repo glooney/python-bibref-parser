@@ -2,8 +2,13 @@ from ..parser import BibRefParser
 import os
 import re
 
-test_filename = 'test_dataset.csv'
-# test_filename = 'anystyle-gold.csv'
+# 101 references. Errors: 9 year (8.9%), 19 title (18.8%), 7 authors (6.9%)
+# test_filename = 'test_dataset.csv'
+test_filename = 'anystyle-gold.csv'
+
+# target : year: 4%, authors: 9%, titles: 9%
+# test   : year: 2%, authors: 5%, titles: 7%
+# any 1k :           authors:16%, titles: 25%
 
 
 class Tester:
@@ -15,14 +20,15 @@ class Tester:
         #included = [2, 3, 4, 9, 15, 20, 21]
         # included = []
         # included = [2, 3, 4]
-        # included = range(1, 302)
-        included = range(1, 105)
+        # included = range(500, 102)
+        included = range(1, 1003)
         # included = [8]
         # included = [19, 80, 20, 69, 4]
         # included = [32, 34, 38, 39]
         # included = range(46, 53)
         # included = [3, 7, 10]
         # included = [68, 70, 72, 73]
+        # included = [75]
 
         input_path = os.path.join(os.path.dirname(__file__), test_filename)
 
@@ -35,6 +41,15 @@ class Tester:
                 line += 1
                 if line < 2 or (included and line not in included):
                     continue
+                if 1 and re.search(r'^[A-Z]{4}', row[1]):
+                    # removes french styled references with uppercase names
+                    # print(row[1])
+                    continue
+                if 1:
+                    p = re.findall(r'\b(1st|2nd|3rd|\dth) [Ee]d\b', row[1])
+                    if p:
+                        # print(p, row[1])
+                        pass
 
                 reference_count += 1
                 parser.parse(row[1])
@@ -63,6 +78,12 @@ def normalise(s, field):
         years = re.findall(r'\d{4,4}', s)
         if years:
             ret = years[0]
+
+    ret = BibRefParser._normalise(ret)
+
+    if field == 'title':
+        ret = re.sub(r', \d[a-z]{2} ed\.?$', r'', ret)
+
     ret = re.sub(r'^[",. ]*(.*?)[",. ]*$', r'\1', ret)
     return ret
 
@@ -98,7 +119,7 @@ class ParsingErrors(list):
         ret += '{} references. Errors: '.format(reference_count)
 
         ret += ', '.join([
-            '{} {}'.format(c, field)
+            '{} {} ({:.1f}%)'.format(c, field, c / reference_count * 100)
             for field, c in stats.items()
         ])
 
